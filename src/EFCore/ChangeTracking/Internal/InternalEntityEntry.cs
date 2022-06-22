@@ -286,7 +286,7 @@ public sealed partial class InternalEntityEntry : IUpdateEntry
             _stateData.EntityState = oldState;
         }
 
-        StateManager.StateChanging(this, newState);
+        FireStateChanging(newState);
 
         if (newState == EntityState.Unchanged
             && oldState == EntityState.Modified)
@@ -388,6 +388,20 @@ public sealed partial class InternalEntityEntry : IUpdateEntry
         }
     }
 
+    private void FireStateChanging(EntityState newState)
+    {
+        if (EntityState != EntityState.Detached)
+        {
+            StateManager.OnStateChanging(this, newState);
+        }
+        else
+        {
+            StateManager.OnTracking(this, newState, fromQuery: false);
+        }
+        
+        StateManager.ChangingState(this, newState);
+    }
+
     private void FireStateChanged(EntityState oldState)
     {
         StateManager.InternalEntityEntryNotifier.StateChanged(this, oldState, fromQuery: false);
@@ -436,6 +450,8 @@ public sealed partial class InternalEntityEntry : IUpdateEntry
     /// </summary>
     public void MarkUnchangedFromQuery()
     {
+        StateManager.OnTracking(this, EntityState.Unchanged, fromQuery: true);
+
         StateManager.InternalEntityEntryNotifier.StateChanging(this, EntityState.Unchanged);
 
         _stateData.EntityState = EntityState.Unchanged;
@@ -553,7 +569,7 @@ public sealed partial class InternalEntityEntry : IUpdateEntry
         {
             if (changeState)
             {
-                StateManager.StateChanging(this, EntityState.Modified);
+                FireStateChanging(EntityState.Modified);
 
                 SetServiceProperties(currentState, EntityState.Modified);
 
@@ -576,7 +592,7 @@ public sealed partial class InternalEntityEntry : IUpdateEntry
                  && !isModified
                  && !_stateData.AnyPropertiesFlagged(PropertyFlag.Modified))
         {
-            StateManager.StateChanging(this, EntityState.Unchanged);
+            FireStateChanging(EntityState.Unchanged);
             _stateData.EntityState = EntityState.Unchanged;
             StateManager.ChangedCount--;
             FireStateChanged(currentState);
